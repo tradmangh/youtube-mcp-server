@@ -25,13 +25,26 @@ export class TranscriptService {
    * - Improves punctuation spacing
    */
   private normalizeText(text: string): string {
-    return text
-      // Replace HTML entities
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+    // First pass: decode common HTML entities in a single pass to avoid double-decoding
+    const entityMap: { [key: string]: string } = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'"
+    };
+    
+    let decodedText = text;
+    // Replace entities in a specific order to handle double-encoded entities correctly
+    // Process longer entities first to avoid incorrect partial replacements
+    Object.entries(entityMap)
+      .sort((a, b) => b[0].length - a[0].length)
+      .forEach(([entity, char]) => {
+        decodedText = decodedText.split(entity).join(char);
+      });
+    
+    return decodedText
       // Remove multiple spaces
       .replace(/\s+/g, ' ')
       // Normalize line breaks
