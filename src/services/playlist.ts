@@ -1,5 +1,15 @@
 import { google } from 'googleapis';
-import { PlaylistParams, PlaylistItemsParams, SearchParams, FindUnavailableVideosParams, RemoveUnavailableVideosParams } from '../types.js';
+import { 
+  PlaylistParams, 
+  PlaylistItemsParams, 
+  SearchParams, 
+  FindUnavailableVideosParams, 
+  RemoveUnavailableVideosParams,
+  FindUnavailableVideosResult,
+  RemoveUnavailableVideosResult,
+  UnavailableVideoItem,
+  RemovalResult
+} from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -103,7 +113,7 @@ export class PlaylistService {
   async findUnavailableVideos({ 
     playlistId, 
     maxResults = 50 
-  }: FindUnavailableVideosParams): Promise<any> {
+  }: FindUnavailableVideosParams): Promise<FindUnavailableVideosResult> {
     try {
       this.initialize();
       
@@ -117,7 +127,6 @@ export class PlaylistService {
       const unavailableItems = items.filter((item: any) => {
         // Check if video is private or deleted
         const privacyStatus = item.status?.privacyStatus;
-        const videoId = item.snippet?.resourceId?.videoId;
         const title = item.snippet?.title;
         
         // Videos that are deleted or private show specific patterns:
@@ -137,12 +146,12 @@ export class PlaylistService {
         playlistId,
         totalItems: items.length,
         unavailableCount: unavailableItems.length,
-        unavailableItems: unavailableItems.map((item: any) => ({
+        unavailableItems: unavailableItems.map((item: any): UnavailableVideoItem => ({
           id: item.id,
-          title: item.snippet?.title,
-          videoId: item.snippet?.resourceId?.videoId,
-          privacyStatus: item.status?.privacyStatus,
-          position: item.snippet?.position
+          title: item.snippet?.title || '',
+          videoId: item.snippet?.resourceId?.videoId || '',
+          privacyStatus: item.status?.privacyStatus || '',
+          position: item.snippet?.position || 0
         }))
       };
     } catch (error) {
@@ -157,19 +166,21 @@ export class PlaylistService {
   async removeUnavailableVideos({ 
     playlistId, 
     playlistItemIds 
-  }: RemoveUnavailableVideosParams): Promise<any> {
+  }: RemoveUnavailableVideosParams): Promise<RemoveUnavailableVideosResult> {
     try {
       this.initialize();
       
       if (!playlistItemIds || playlistItemIds.length === 0) {
         return {
           playlistId,
+          totalAttempted: 0,
           removedCount: 0,
-          message: 'No playlist item IDs provided for removal'
+          failedCount: 0,
+          results: []
         };
       }
       
-      const results = [];
+      const results: RemovalResult[] = [];
       let successCount = 0;
       let failureCount = 0;
       

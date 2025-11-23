@@ -182,7 +182,7 @@ export async function startMcpServer() {
                 },
                 {
                     name: 'playlists_removeUnavailableVideos',
-                    description: 'Remove unavailable videos from a YouTube playlist. Requires playlist item IDs obtained from find_unavailable_videos.',
+                    description: 'Remove unavailable videos from a YouTube playlist. Requires playlist item IDs obtained from playlists_findUnavailableVideos.',
                     inputSchema: {
                         type: 'object',
                         properties: {

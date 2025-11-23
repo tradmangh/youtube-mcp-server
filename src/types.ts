@@ -93,3 +93,45 @@ export interface RemoveUnavailableVideosParams {
   playlistId: string;
   playlistItemIds: string[];
 }
+
+/**
+ * Unavailable video item information
+ */
+export interface UnavailableVideoItem {
+  id: string;
+  title: string;
+  videoId: string;
+  privacyStatus: string;
+  position: number;
+}
+
+/**
+ * Find unavailable videos result
+ */
+export interface FindUnavailableVideosResult {
+  playlistId: string;
+  totalItems: number;
+  unavailableCount: number;
+  unavailableItems: UnavailableVideoItem[];
+}
+
+/**
+ * Removal result for a single playlist item
+ */
+export interface RemovalResult {
+  itemId: string;
+  status: 'removed' | 'failed';
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Remove unavailable videos result
+ */
+export interface RemoveUnavailableVideosResult {
+  playlistId: string;
+  totalAttempted: number;
+  removedCount: number;
+  failedCount: number;
+  results: RemovalResult[];
+}
