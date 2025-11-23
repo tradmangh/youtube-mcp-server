@@ -77,3 +77,11 @@ export interface PlaylistItemsParams {
   playlistId: string;
   maxResults?: number;
 }
+
+/**
+ * Playlist items since parameters
+ */
+export interface PlaylistItemsSinceParams {
+  playlistId: string;
+  since: string;
+}

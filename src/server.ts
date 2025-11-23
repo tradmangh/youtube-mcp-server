@@ -16,6 +16,7 @@ import {
     ChannelVideosParams,
     PlaylistParams,
     PlaylistItemsParams,
+    PlaylistItemsSinceParams,
 } from './types.js';
 
 export async function startMcpServer() {
@@ -160,6 +161,24 @@ export async function startMcpServer() {
                         required: ['playlistId'],
                     },
                 },
+                {
+                    name: 'playlists_getPlaylistItemsSince',
+                    description: 'Get playlist items added after a specific timestamp',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            playlistId: {
+                                type: 'string',
+                                description: 'The YouTube playlist ID',
+                            },
+                            since: {
+                                type: 'string',
+                                description: 'ISO-8601 timestamp (e.g., "2024-01-01T00:00:00Z"). Returns items added strictly after this time.',
+                            },
+                        },
+                        required: ['playlistId', 'since'],
+                    },
+                },
             ],
         };
     });
@@ -231,6 +250,16 @@ export async function startMcpServer() {
                 
                 case 'playlists_getPlaylistItems': {
                     const result = await playlistService.getPlaylistItems(args as unknown as PlaylistItemsParams);
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: JSON.stringify(result, null, 2)
+                        }]
+                    };
+                }
+                
+                case 'playlists_getPlaylistItemsSince': {
+                    const result = await playlistService.getPlaylistItemsSince(args as unknown as PlaylistItemsSinceParams);
                     return {
                         content: [{
                             type: 'text',
