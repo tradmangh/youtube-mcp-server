@@ -41,6 +41,25 @@ export interface TranscriptParams {
 }
 
 /**
+ * Timestamped segment in a transcript
+ */
+export interface TimestampedSegment {
+  timestamp: string;
+  text: string;
+}
+
+/**
+ * Normalized transcript response
+ */
+export interface NormalizedTranscriptResponse {
+  videoId: string;
+  language: string;
+  plainText: string;
+  timestampedSegments: TimestampedSegment[];
+  segmentCount: number;
+}
+
+/**
  * Search transcript parameters
  */
 export interface SearchTranscriptParams {
