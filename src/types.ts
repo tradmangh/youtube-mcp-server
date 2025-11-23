@@ -86,3 +86,56 @@ export interface MergePlaylistsParams {
   targetPlaylist: string;
   dedupe?: boolean;
 }
+
+/**
+ * Merge report for a single source playlist
+ */
+export interface SourcePlaylistReport {
+  playlistId: string;
+  itemCount: number;
+  itemsAdded: number;
+  duplicatesSkipped: number;
+}
+
+/**
+ * Error information in merge report
+ */
+export interface MergeError {
+  playlistId: string;
+  error: string;
+  itemId?: string;
+}
+
+/**
+ * Target playlist information
+ */
+export interface TargetPlaylistInfo {
+  title?: string;
+  description?: string;
+  itemCount?: number;
+}
+
+/**
+ * Item to be merged
+ */
+export interface MergeItem {
+  videoId: string;
+  title?: string;
+  sourcePlaylistId: string;
+  position?: number;
+}
+
+/**
+ * Complete merge playlists report
+ */
+export interface MergePlaylistsReport {
+  sourcePlaylists: SourcePlaylistReport[];
+  targetPlaylist: string;
+  totalItemsProcessed: number;
+  uniqueItems: number;
+  duplicatesRemoved: number;
+  errors: MergeError[];
+  targetPlaylistInfo?: TargetPlaylistInfo;
+  itemsToMerge: MergeItem[];
+  summary: string;
+}

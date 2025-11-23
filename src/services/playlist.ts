@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { PlaylistParams, PlaylistItemsParams, SearchParams, MergePlaylistsParams } from '../types.js';
+import { PlaylistParams, PlaylistItemsParams, SearchParams, MergePlaylistsParams, MergePlaylistsReport, SourcePlaylistReport, MergeItem, MergeError } from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -104,7 +104,7 @@ export class PlaylistService {
     sourcePlaylists,
     targetPlaylist,
     dedupe = false
-  }: MergePlaylistsParams): Promise<any> {
+  }: MergePlaylistsParams): Promise<MergePlaylistsReport> {
     try {
       this.initialize();
 
@@ -116,17 +116,19 @@ export class PlaylistService {
         throw new Error('Target playlist is required');
       }
 
-      const report: any = {
+      const report: MergePlaylistsReport = {
         sourcePlaylists: [],
         targetPlaylist: targetPlaylist,
         totalItemsProcessed: 0,
         uniqueItems: 0,
         duplicatesRemoved: 0,
-        errors: []
+        errors: [],
+        itemsToMerge: [],
+        summary: ''
       };
 
       // Fetch all items from source playlists
-      const allItems: any[] = [];
+      const allItems: MergeItem[] = [];
       const videoIdSet = new Set<string>();
 
       for (const playlistId of sourcePlaylists) {
@@ -134,7 +136,7 @@ export class PlaylistService {
           // Fetch all items from this playlist (may need pagination for large playlists)
           const items = await this.getAllPlaylistItems(playlistId);
           
-          const sourceReport = {
+          const sourceReport: SourcePlaylistReport = {
             playlistId: playlistId,
             itemCount: items.length,
             itemsAdded: 0,
@@ -145,11 +147,12 @@ export class PlaylistService {
             const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
             
             if (!videoId) {
-              report.errors.push({
+              const error: MergeError = {
                 playlistId: playlistId,
                 error: 'Missing videoId for item',
                 itemId: item.id
-              });
+              };
+              report.errors.push(error);
               continue;
             }
 
@@ -159,12 +162,13 @@ export class PlaylistService {
               sourceReport.duplicatesSkipped++;
               report.duplicatesRemoved++;
             } else {
-              allItems.push({
+              const mergeItem: MergeItem = {
                 videoId: videoId,
                 title: item.snippet?.title,
                 sourcePlaylistId: playlistId,
                 position: item.snippet?.position
-              });
+              };
+              allItems.push(mergeItem);
               videoIdSet.add(videoId);
               sourceReport.itemsAdded++;
             }
@@ -172,10 +176,11 @@ export class PlaylistService {
 
           report.sourcePlaylists.push(sourceReport);
         } catch (error) {
-          report.errors.push({
+          const mergeError: MergeError = {
             playlistId: playlistId,
             error: error instanceof Error ? error.message : String(error)
-          });
+          };
+          report.errors.push(mergeError);
         }
       }
 
@@ -190,10 +195,11 @@ export class PlaylistService {
           itemCount: targetInfo?.contentDetails?.itemCount
         };
       } catch (error) {
-        report.errors.push({
+        const mergeError: MergeError = {
           playlistId: targetPlaylist,
           error: `Failed to fetch target playlist: ${error instanceof Error ? error.message : String(error)}`
-        });
+        };
+        report.errors.push(mergeError);
       }
 
       // Return the merge report with items that would be added
