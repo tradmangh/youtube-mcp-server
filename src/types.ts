@@ -77,3 +77,12 @@ export interface PlaylistItemsParams {
   playlistId: string;
   maxResults?: number;
 }
+
+/**
+ * Merge playlists parameters
+ */
+export interface MergePlaylistsParams {
+  sourcePlaylists: string[];
+  targetPlaylist: string;
+  dedupe?: boolean;
+}
