@@ -135,3 +135,20 @@ export interface RemoveUnavailableVideosResult {
   failedCount: number;
   results: RemovalResult[];
 }
+
+/**
+ * YouTube playlist item from API response (minimal subset)
+ */
+export interface YouTubePlaylistItem {
+  id?: string;
+  snippet?: {
+    title?: string;
+    position?: number;
+    resourceId?: {
+      videoId?: string;
+    };
+  };
+  status?: {
+    privacyStatus?: string;
+  };
+}

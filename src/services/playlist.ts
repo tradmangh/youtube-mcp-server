@@ -8,7 +8,8 @@ import {
   FindUnavailableVideosResult,
   RemoveUnavailableVideosResult,
   UnavailableVideoItem,
-  RemovalResult
+  RemovalResult,
+  YouTubePlaylistItem
 } from '../types.js';
 
 /**
@@ -118,13 +119,13 @@ export class PlaylistService {
       this.initialize();
       
       const response = await this.youtube.playlistItems.list({
-        part: ['snippet', 'contentDetails', 'status'],
+        part: ['snippet', 'status'],
         playlistId,
         maxResults
       });
       
       const items = response.data.items || [];
-      const unavailableItems = items.filter((item: any) => {
+      const unavailableItems = items.filter((item: YouTubePlaylistItem) => {
         // Check if video is private or deleted
         const privacyStatus = item.status?.privacyStatus;
         const title = item.snippet?.title;
@@ -132,7 +133,6 @@ export class PlaylistService {
         // Videos that are deleted or private show specific patterns:
         // 1. Title is "Deleted video" or "Private video"
         // 2. Privacy status is 'private' or 'privacyStatusUnspecified'
-        // 3. Thumbnail URLs are missing or default
         const isDeletedOrPrivate = 
           title === 'Deleted video' || 
           title === 'Private video' ||
@@ -146,8 +146,8 @@ export class PlaylistService {
         playlistId,
         totalItems: items.length,
         unavailableCount: unavailableItems.length,
-        unavailableItems: unavailableItems.map((item: any): UnavailableVideoItem => ({
-          id: item.id,
+        unavailableItems: unavailableItems.map((item: YouTubePlaylistItem): UnavailableVideoItem => ({
+          id: item.id || '',
           title: item.snippet?.title || '',
           videoId: item.snippet?.resourceId?.videoId || '',
           privacyStatus: item.status?.privacyStatus || '',
