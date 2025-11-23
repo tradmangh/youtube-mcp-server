@@ -160,6 +160,19 @@ export async function startMcpServer() {
                         required: ['playlistId'],
                     },
                 },
+                {
+                    name: 'playlists_getMyPlaylists',
+                    description: 'Get playlists owned by the authenticated user (requires OAuth authentication)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            maxResults: {
+                                type: 'number',
+                                description: 'Maximum number of results to return',
+                            },
+                        },
+                    },
+                },
             ],
         };
     });
@@ -231,6 +244,16 @@ export async function startMcpServer() {
                 
                 case 'playlists_getPlaylistItems': {
                     const result = await playlistService.getPlaylistItems(args as unknown as PlaylistItemsParams);
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: JSON.stringify(result, null, 2)
+                        }]
+                    };
+                }
+                
+                case 'playlists_getMyPlaylists': {
+                    const result = await playlistService.getMyPlaylists(args as unknown as { maxResults?: number });
                     return {
                         content: [{
                             type: 'text',

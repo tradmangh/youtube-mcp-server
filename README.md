@@ -33,6 +33,8 @@ A Model Context Protocol (MCP) server implementation for YouTube, enabling AI la
 
 ### Quick Setup for Claude Desktop
 
+#### API Key Mode (Basic Features)
+
 1. Install the package:
 ```bash
 npm install -g zubeid-youtube-mcp-server
@@ -53,6 +55,38 @@ npm install -g zubeid-youtube-mcp-server
 }
 ```
 
+#### OAuth Mode (For Private Playlists)
+
+1. Install the package and authorize:
+```bash
+npm install -g zubeid-youtube-mcp-server
+
+# Set OAuth credentials
+export YOUTUBE_OAUTH_CLIENT_ID="your_client_id"
+export YOUTUBE_OAUTH_CLIENT_SECRET="your_client_secret"
+
+# Run authorization
+zubeid-youtube-mcp-server authorize
+```
+
+2. Add to your Claude Desktop configuration with OAuth credentials:
+
+```json
+{
+  "mcpServers": {
+    "zubeid-youtube-mcp-server": {
+      "command": "zubeid-youtube-mcp-server",
+      "env": {
+        "YOUTUBE_OAUTH_CLIENT_ID": "your_client_id_here",
+        "YOUTUBE_OAUTH_CLIENT_SECRET": "your_client_secret_here"
+      }
+    }
+  }
+}
+```
+
+**Note:** After adding OAuth credentials to config, the token file (`~/.youtube-mcp-token.json`) will be used automatically for authentication.
+
 ### Alternative: Using NPX (No Installation Required)
 
 Add this to your Claude Desktop configuration:
@@ -71,6 +105,27 @@ Add this to your Claude Desktop configuration:
 }
 ```
 
+For OAuth with NPX, first authorize locally:
+```bash
+YOUTUBE_OAUTH_CLIENT_ID="..." YOUTUBE_OAUTH_CLIENT_SECRET="..." npx zubeid-youtube-mcp-server authorize
+```
+
+Then update your config:
+```json
+{
+  "mcpServers": {
+    "youtube": {
+      "command": "npx",
+      "args": ["-y", "zubeid-youtube-mcp-server"],
+      "env": {
+        "YOUTUBE_OAUTH_CLIENT_ID": "your_client_id_here",
+        "YOUTUBE_OAUTH_CLIENT_SECRET": "your_client_secret_here"
+      }
+    }
+  }
+}
+```
+
 ### Installing via Smithery
 
 To install YouTube MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@ZubeidHendricks/youtube):
@@ -80,9 +135,69 @@ npx -y @smithery/cli install @ZubeidHendricks/youtube --client claude
 ```
 
 ## Configuration
-Set the following environment variables:
+
+### Authentication Modes
+
+The YouTube MCP Server supports two authentication modes:
+
+#### 1. API Key Mode (Default)
+Simple and suitable for public data access.
+
+**Required Environment Variables:**
 * `YOUTUBE_API_KEY`: Your YouTube Data API key (required)
 * `YOUTUBE_TRANSCRIPT_LANG`: Default language for transcripts (optional, defaults to 'en')
+
+#### 2. OAuth Mode (Optional)
+Required for accessing private playlists and user-specific data.
+
+**Required Environment Variables:**
+* `YOUTUBE_OAUTH_CLIENT_ID`: Your OAuth 2.0 client ID
+* `YOUTUBE_OAUTH_CLIENT_SECRET`: Your OAuth 2.0 client secret
+* `YOUTUBE_OAUTH_REDIRECT_URI`: Redirect URI (optional, defaults to 'urn:ietf:wg:oauth:2.0:oob')
+* `YOUTUBE_OAUTH_SCOPES`: Comma-separated list of OAuth scopes (optional)
+
+**Default OAuth Scopes:**
+- `https://www.googleapis.com/auth/youtube.readonly` - Read access to YouTube data
+- `https://www.googleapis.com/auth/youtube.force-ssl` - Access to manage playlists
+
+### Setting up OAuth Authentication
+
+1. **Get OAuth Credentials:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create a new project or select an existing one
+   - Enable the YouTube Data API v3
+   - Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
+   - Choose application type (Desktop app recommended)
+   - Copy the Client ID and Client Secret
+
+2. **Configure Environment Variables:**
+   ```bash
+   export YOUTUBE_OAUTH_CLIENT_ID="your_client_id"
+   export YOUTUBE_OAUTH_CLIENT_SECRET="your_client_secret"
+   ```
+
+3. **Authorize the Application:**
+   ```bash
+   npx zubeid-youtube-mcp-server authorize
+   ```
+   
+   This will:
+   - Display an authorization URL
+   - Open it in your browser to grant permissions
+   - Prompt you to enter the authorization code
+   - Save the token securely in `~/.youtube-mcp-token.json`
+
+4. **Start Using OAuth Features:**
+   Once authorized, you can access private playlists and use OAuth-only features.
+
+### OAuth-Only Features
+
+When OAuth is configured and authorized, you gain access to:
+- **Private playlists**: Access your own private and unlisted playlists
+- **User playlists**: List all playlists owned by the authenticated user
+- **Unlisted videos**: Access unlisted video content
+
+Use the `playlists_getMyPlaylists` tool to list your own playlists (requires OAuth).
 ### Using with VS Code
 
 For one-click installation, click one of the install buttons below:
@@ -143,11 +258,23 @@ Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace
 }
 ```
 ## YouTube API Setup
-1. Go to Google Cloud Console
+
+### API Key Setup (For Basic Features)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Create a new project or select an existing one
 3. Enable the YouTube Data API v3
 4. Create API credentials (API key)
 5. Copy the API key for configuration
+
+### OAuth Setup (For Private Playlists and Advanced Features)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project or select an existing one
+3. Enable the YouTube Data API v3
+4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
+5. Configure OAuth consent screen if prompted
+6. Choose application type: "Desktop app" (recommended) or "Web application"
+7. Copy the Client ID and Client Secret
+8. Run `npx zubeid-youtube-mcp-server authorize` to complete authorization
 
 ## Examples
 
@@ -190,7 +317,7 @@ const videos = await youtube.channels.listVideos({
 ### Managing Playlists
 
 ```javascript
-// Get playlist items
+// Get playlist items (works with public and private playlists if authenticated)
 const playlistItems = await youtube.playlists.getPlaylistItems({
   playlistId: "playlist-id",
   maxResults: 50
@@ -199,6 +326,33 @@ const playlistItems = await youtube.playlists.getPlaylistItems({
 // Get playlist details
 const playlist = await youtube.playlists.getPlaylist({
   playlistId: "playlist-id"
+});
+
+// Get user's own playlists (requires OAuth)
+const myPlaylists = await youtube.playlists.getMyPlaylists({
+  maxResults: 50
+});
+```
+
+### OAuth-Enabled Examples
+
+When OAuth is configured, you can access private content:
+
+```javascript
+// List your private playlists
+const myPlaylists = await youtube.playlists.getMyPlaylists({
+  maxResults: 50
+});
+
+// Access private playlist items
+const privatePlaylistItems = await youtube.playlists.getPlaylistItems({
+  playlistId: "your-private-playlist-id",
+  maxResults: 50
+});
+
+// Get details of unlisted videos (if you have access)
+const unlistedVideo = await youtube.videos.getVideo({
+  videoId: "unlisted-video-id"
 });
 ```
 
