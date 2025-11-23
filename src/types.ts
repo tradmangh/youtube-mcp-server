@@ -77,3 +77,19 @@ export interface PlaylistItemsParams {
   playlistId: string;
   maxResults?: number;
 }
+
+/**
+ * Find unavailable videos parameters
+ */
+export interface FindUnavailableVideosParams {
+  playlistId: string;
+  maxResults?: number;
+}
+
+/**
+ * Remove unavailable videos parameters
+ */
+export interface RemoveUnavailableVideosParams {
+  playlistId: string;
+  playlistItemIds: string[];
+}
