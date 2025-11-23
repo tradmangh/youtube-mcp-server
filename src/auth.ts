@@ -95,16 +95,14 @@ export class AuthManager {
     } catch (error) {
       // No valid token found, need to authorize
       console.log('No valid OAuth token found. Authorization required.');
-      console.log('Please run the authorization flow to obtain a token.');
+      console.log('Run: npx zubeid-youtube-mcp-server authorize');
       
       // In a server context, we can't do interactive auth
       // The token must be obtained separately and stored
-      if (process.env.YOUTUBE_OAUTH_ENABLED === 'true') {
-        throw new Error(
-          'OAuth is enabled but no valid token found. Please run authorization flow first. ' +
-          'Set YOUTUBE_OAUTH_ENABLED=false to use API key mode.'
-        );
-      }
+      throw new Error(
+        'OAuth is enabled but no valid token found. Please run authorization flow first: ' +
+        'npx zubeid-youtube-mcp-server authorize'
+      );
     }
   }
 
@@ -206,6 +204,12 @@ export class AuthManager {
     }
 
     try {
+      // Ensure directory exists
+      const tokenDir = path.dirname(this.tokenPath);
+      if (!fs.existsSync(tokenDir)) {
+        fs.mkdirSync(tokenDir, { recursive: true, mode: 0o700 });
+      }
+      
       fs.writeFileSync(this.tokenPath, JSON.stringify(token, null, 2), { mode: 0o600 });
       console.log('Token saved successfully');
     } catch (error) {
