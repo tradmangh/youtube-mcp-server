@@ -77,3 +77,31 @@ export interface PlaylistItemsParams {
   playlistId: string;
   maxResults?: number;
 }
+
+/**
+ * Playlist item representation
+ */
+export interface PlaylistItem {
+  kind?: string;
+  etag?: string;
+  id?: string;
+  snippet?: {
+    publishedAt?: string;
+    channelId?: string;
+    title?: string;
+    description?: string;
+    thumbnails?: any;
+    channelTitle?: string;
+    playlistId?: string;
+    position?: number;
+    resourceId?: {
+      kind?: string;
+      videoId?: string;
+    };
+  };
+  contentDetails?: {
+    videoId?: string;
+    videoPublishedAt?: string;
+  };
+  addedAt?: string; // ISO-8601 timestamp when the item was added to the playlist
+}

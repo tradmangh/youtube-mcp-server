@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { PlaylistParams, PlaylistItemsParams, SearchParams } from '../types.js';
+import { PlaylistParams, PlaylistItemsParams, SearchParams, PlaylistItem } from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -57,7 +57,7 @@ export class PlaylistService {
   async getPlaylistItems({ 
     playlistId, 
     maxResults = 50 
-  }: PlaylistItemsParams): Promise<any[]> {
+  }: PlaylistItemsParams): Promise<PlaylistItem[]> {
     try {
       this.initialize();
       
@@ -67,7 +67,13 @@ export class PlaylistService {
         maxResults
       });
       
-      return response.data.items || [];
+      const items = response.data.items || [];
+      
+      // Map the snippet.publishedAt field to addedAt for each item
+      return items.map((item: any) => ({
+        ...item,
+        addedAt: item.snippet?.publishedAt
+      }));
     } catch (error) {
       throw new Error(`Failed to get playlist items: ${error instanceof Error ? error.message : String(error)}`);
     }
