@@ -144,7 +144,6 @@ export class PlaylistService {
         const isDeletedOrPrivate = 
           title === 'Deleted video' || 
           title === 'Private video' ||
-          privacyStatus === 'private' ||
           privacyStatus === 'privacyStatusUnspecified';
         
         return isDeletedOrPrivate;
