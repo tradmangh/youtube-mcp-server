@@ -223,6 +223,9 @@ export class PlaylistService {
       };
     } catch (error) {
       throw new Error(`Failed to remove unavailable videos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+  /**
    * Get playlist items added after a specific timestamp
    */
   async getPlaylistItemsSince({ 
