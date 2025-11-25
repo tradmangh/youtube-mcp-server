@@ -206,6 +206,20 @@ export async function startMcpServer() {
                 {
                     name: 'playlists_findUnavailableVideos',
                     description: 'Find unavailable videos in a YouTube playlist (deleted, private, or otherwise inaccessible)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            playlistId: {
+                                type: 'string',
+                                description: 'The YouTube playlist ID',
+                            },
+                            maxResults: {
+                                type: 'number',
+                                description: 'Maximum number of results to check',
+                            },
+                        },
+                        required: ['playlistId'],
+                    },
                 },
                 {
                     name: 'playlists_removeUnavailableVideos',
