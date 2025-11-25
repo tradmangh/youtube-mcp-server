@@ -141,7 +141,6 @@ export interface FindUnavailableVideosResult {
 export interface RemovalResult {
   itemId: string;
   status: 'removed' | 'failed';
-  success: boolean;
   error?: string;
 }
 
