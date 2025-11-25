@@ -79,6 +79,11 @@ export interface PlaylistItemsParams {
 }
 
 /**
+ * Playlist items since parameters
+ */
+export interface PlaylistItemsSinceParams {
+  playlistId: string;
+  since: string;
  * Playlist item representation
  */
 export interface PlaylistItem {
