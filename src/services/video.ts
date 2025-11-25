@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { VideoParams, SearchParams, TrendingParams, RelatedVideosParams } from '../types.js';
+import { AuthManager } from '../auth.js';
 
 /**
  * Service for interacting with YouTube videos
@@ -7,25 +8,24 @@ import { VideoParams, SearchParams, TrendingParams, RelatedVideosParams } from '
 export class VideoService {
   private youtube;
   private initialized = false;
+  private authManager: AuthManager;
 
   constructor() {
-    // Don't initialize in constructor
+    this.authManager = AuthManager.getInstance();
   }
 
   /**
    * Initialize the YouTube client only when needed
    */
-  private initialize() {
+  private async initialize() {
     if (this.initialized) return;
     
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) {
-      throw new Error('YOUTUBE_API_KEY environment variable is not set.');
-    }
+    await this.authManager.initialize();
+    const auth = this.authManager.getAuth();
 
     this.youtube = google.youtube({
       version: 'v3',
-      auth: apiKey
+      auth: auth
     });
     
     this.initialized = true;
@@ -39,7 +39,7 @@ export class VideoService {
     parts = ['snippet', 'contentDetails', 'statistics'] 
   }: VideoParams): Promise<any> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.videos.list({
         part: parts,
@@ -60,7 +60,7 @@ export class VideoService {
     maxResults = 10 
   }: SearchParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.search.list({
         part: ['snippet'],
@@ -82,7 +82,7 @@ export class VideoService {
     videoId 
   }: { videoId: string }): Promise<any> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.videos.list({
         part: ['statistics'],
@@ -104,7 +104,7 @@ export class VideoService {
     videoCategoryId = ''
   }: TrendingParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const params: any = {
         part: ['snippet', 'contentDetails', 'statistics'],
@@ -133,7 +133,7 @@ export class VideoService {
     maxResults = 10 
   }: RelatedVideosParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.search.list({
         part: ['snippet'],

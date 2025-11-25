@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { AuthManager } from '../auth.js';
 import { 
   PlaylistItem,
   PlaylistParams, 
@@ -25,25 +26,24 @@ import {
 export class PlaylistService {
   private youtube;
   private initialized = false;
+  private authManager: AuthManager;
 
   constructor() {
-    // Don't initialize in constructor
+    this.authManager = AuthManager.getInstance();
   }
 
   /**
    * Initialize the YouTube client only when needed
    */
-  private initialize() {
+  private async initialize() {
     if (this.initialized) return;
     
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) {
-      throw new Error('YOUTUBE_API_KEY environment variable is not set.');
-    }
+    await this.authManager.initialize();
+    const auth = this.authManager.getAuth();
 
     this.youtube = google.youtube({
       version: "v3",
-      auth: apiKey
+      auth: auth
     });
     
     this.initialized = true;
@@ -56,7 +56,7 @@ export class PlaylistService {
     playlistId 
   }: PlaylistParams): Promise<any> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.playlists.list({
         part: ['snippet', 'contentDetails'],
@@ -77,7 +77,7 @@ export class PlaylistService {
     maxResults = 50 
   }: PlaylistItemsParams): Promise<PlaylistItem[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.playlistItems.list({
         part: ['snippet', 'contentDetails'],
@@ -105,7 +105,7 @@ export class PlaylistService {
     maxResults = 10 
   }: SearchParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.search.list({
         part: ['snippet'],
@@ -121,6 +121,27 @@ export class PlaylistService {
   }
 
   /**
+   * List playlists owned by the authenticated user (requires OAuth)
+   */
+  async getMyPlaylists({ 
+    maxResults = 50 
+  }: { maxResults?: number } = {}): Promise<any[]> {
+    try {
+      await this.initialize();
+      
+      if (this.authManager.getAuthMode() !== 'oauth') {
+        throw new Error('This operation requires OAuth authentication. Please configure OAuth credentials.');
+      }
+      
+      const response = await this.youtube.playlists.list({
+        part: ['snippet', 'contentDetails', 'status'],
+        mine: true,
+        maxResults
+      });
+      
+      return response.data.items || [];
+    } catch (error) {
+      throw new Error(`Failed to get user playlists: ${error instanceof Error ? error.message : String(error)}`);
    * Find unavailable videos in a playlist
    * Returns playlist items that are deleted, private, or otherwise unavailable
    */

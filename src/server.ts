@@ -187,6 +187,16 @@ export async function startMcpServer() {
                     },
                 },
                 {
+                    name: 'playlists_getMyPlaylists',
+                    description: 'Get playlists owned by the authenticated user (requires OAuth authentication)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            maxResults: {
+                                type: 'number',
+                                description: 'Maximum number of results to return',
+                            },
+                        },
                     name: 'playlists_mergePlaylists',
                     description: 'Merge multiple playlists by consolidating their items. Returns a detailed report showing items from all source playlists, with optional deduplication by videoId.',
                     inputSchema: {
@@ -367,6 +377,8 @@ export async function startMcpServer() {
                     };
                 }
                 
+                case 'playlists_getMyPlaylists': {
+                    const result = await playlistService.getMyPlaylists(args as unknown as { maxResults?: number });
                 case 'playlists_findUnavailableVideos': {
                     const result = await playlistService.findUnavailableVideos(args as unknown as FindUnavailableVideosParams);
                     return {

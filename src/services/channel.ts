@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { ChannelParams, ChannelVideosParams } from '../types.js';
+import { AuthManager } from '../auth.js';
 
 /**
  * Service for interacting with YouTube channels
@@ -7,25 +8,24 @@ import { ChannelParams, ChannelVideosParams } from '../types.js';
 export class ChannelService {
   private youtube;
   private initialized = false;
+  private authManager: AuthManager;
 
   constructor() {
-    // Don't initialize in constructor
+    this.authManager = AuthManager.getInstance();
   }
 
   /**
    * Initialize the YouTube client only when needed
    */
-  private initialize() {
+  private async initialize() {
     if (this.initialized) return;
     
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) {
-      throw new Error('YOUTUBE_API_KEY environment variable is not set.');
-    }
+    await this.authManager.initialize();
+    const auth = this.authManager.getAuth();
 
     this.youtube = google.youtube({
       version: 'v3',
-      auth: apiKey
+      auth: auth
     });
     
     this.initialized = true;
@@ -38,7 +38,7 @@ export class ChannelService {
     channelId 
   }: ChannelParams): Promise<any> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.channels.list({
         part: ['snippet', 'statistics', 'contentDetails'],
@@ -59,7 +59,7 @@ export class ChannelService {
     maxResults = 50 
   }: ChannelVideosParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.playlists.list({
         part: ['snippet', 'contentDetails'],
@@ -81,7 +81,7 @@ export class ChannelService {
     maxResults = 50 
   }: ChannelVideosParams): Promise<any[]> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.search.list({
         part: ['snippet'],
@@ -104,7 +104,7 @@ export class ChannelService {
     channelId 
   }: ChannelParams): Promise<any> {
     try {
-      this.initialize();
+      await this.initialize();
       
       const response = await this.youtube.channels.list({
         part: ['statistics'],

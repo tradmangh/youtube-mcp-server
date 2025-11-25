@@ -1,6 +1,9 @@
 # Environment variables
 .env
 
+# OAuth token (never commit this!)
+.youtube-mcp-token.json
+
 # Dependencies
 /node_modules
 node_modules/
