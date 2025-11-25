@@ -16,8 +16,10 @@ import {
     ChannelVideosParams,
     PlaylistParams,
     PlaylistItemsParams,
+    FindUnavailableVideosParams,
+    RemoveUnavailableVideosParams,
     MergePlaylistsParams,
-    PlaylistItemsSinceParams,
+    PlaylistItemsSinceParams
 } from './types.js';
 
 export async function startMcpServer() {
@@ -219,6 +221,51 @@ export async function startMcpServer() {
                                 type: 'string',
                                 description: 'The YouTube playlist ID',
                             },
+                            maxResults: {
+                                type: 'number',
+                                description: 'Maximum number of playlist items to check',
+                            },
+                        },
+                        required: ['playlistId'],
+                    },
+                },
+                {
+                    name: 'playlists_findUnavailableVideos',
+                    description: 'Find unavailable videos in a YouTube playlist (deleted, private, or otherwise inaccessible)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            playlistId: {
+                                type: 'string',
+                                description: 'The YouTube playlist ID',
+                            },
+                            maxResults: {
+                                type: 'number',
+                                description: 'Maximum number of results to check',
+                            },
+                        },
+                        required: ['playlistId'],
+                    },
+                },
+                {
+                    name: 'playlists_removeUnavailableVideos',
+                    description: 'Remove unavailable videos from a YouTube playlist. Requires playlist item IDs obtained from playlists_findUnavailableVideos.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            playlistId: {
+                                type: 'string',
+                                description: 'The YouTube playlist ID',
+                            },
+                            playlistItemIds: {
+                                type: 'array',
+                                description: 'Array of playlist item IDs to remove',
+                                items: {
+                                    type: 'string',
+                                },
+                            },
+                        },
+                        required: ['playlistId', 'playlistItemIds'],
                             since: {
                                 type: 'string',
                                 description: 'ISO-8601 timestamp (e.g., "2024-01-01T00:00:00Z"). Returns items added strictly after this time.',
@@ -319,6 +366,26 @@ export async function startMcpServer() {
                         }]
                     };
                 }
+                
+                case 'playlists_findUnavailableVideos': {
+                    const result = await playlistService.findUnavailableVideos(args as unknown as FindUnavailableVideosParams);
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: JSON.stringify(result, null, 2)
+                        }]
+                    };
+                }
+                
+                case 'playlists_removeUnavailableVideos': {
+                    const result = await playlistService.removeUnavailableVideos(args as unknown as RemoveUnavailableVideosParams);
+                    return {
+                        content: [{
+                            type: 'text',
+                                text: JSON.stringify(result, null, 2)
+                            }]
+                        };
+                    }
                 case 'playlists_getPlaylistItemsSince': {
                     const result = await playlistService.getPlaylistItemsSince(args as unknown as PlaylistItemsSinceParams);
                     return {

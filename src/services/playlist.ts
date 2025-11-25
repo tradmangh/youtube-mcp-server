@@ -1,5 +1,23 @@
 import { google } from 'googleapis';
-import { PlaylistItem, PlaylistParams, PlaylistItemsParams,  PlaylistItemsSinceParams, SearchParams, MergePlaylistsParams, MergePlaylistsReport, SourcePlaylistReport, MergeItem, MergeError } from '../types.js';
+import { 
+  PlaylistItem,
+  PlaylistParams, 
+  PlaylistItemsParams, 
+  PlaylistItemsSinceParams,
+  SearchParams, 
+  FindUnavailableVideosParams, 
+  RemoveUnavailableVideosParams,
+  FindUnavailableVideosResult,
+  RemoveUnavailableVideosResult,
+  UnavailableVideoItem,
+  RemovalResult,
+  YouTubePlaylistItem,
+  MergePlaylistsParams, 
+  MergePlaylistsReport, 
+  SourcePlaylistReport, 
+  MergeItem, 
+  MergeError 
+} from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -101,6 +119,116 @@ export class PlaylistService {
       throw new Error(`Failed to search playlists: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  /**
+   * Find unavailable videos in a playlist
+   * Returns playlist items that are deleted, private, or otherwise unavailable
+   */
+  async findUnavailableVideos({ 
+    playlistId, 
+    maxResults = 50 
+  }: FindUnavailableVideosParams): Promise<FindUnavailableVideosResult> {
+    try {
+      this.initialize();
+      
+      const response = await this.youtube.playlistItems.list({
+        part: ['snippet', 'status'],
+        playlistId,
+        maxResults
+      });
+      
+      const items = response.data.items || [];
+      const unavailableItems = items.filter((item: YouTubePlaylistItem) => {
+        // Check if video is private or deleted
+        const privacyStatus = item.status?.privacyStatus;
+        const title = item.snippet?.title;
+        
+        // Videos that are deleted or private show specific patterns:
+        // 1. Title is "Deleted video" or "Private video"
+        // 2. Privacy status is 'private' or 'privacyStatusUnspecified'
+        const isDeletedOrPrivate = 
+          title === 'Deleted video' || 
+          title === 'Private video' ||
+          privacyStatus === 'privacyStatusUnspecified';
+        
+        return isDeletedOrPrivate;
+      });
+      
+      return {
+        playlistId,
+        totalItems: items.length,
+        unavailableCount: unavailableItems.length,
+        unavailableItems: unavailableItems.map((item: YouTubePlaylistItem): UnavailableVideoItem => ({
+          id: item.id || '',
+          title: item.snippet?.title || '',
+          videoId: item.snippet?.resourceId?.videoId || '',
+          privacyStatus: item.status?.privacyStatus || '',
+          position: item.snippet?.position || 0
+        }))
+      };
+    } catch (error) {
+      throw new Error(`Failed to find unavailable videos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Remove unavailable videos from a playlist
+   * Deletes the specified playlist items
+   */
+  async removeUnavailableVideos({ 
+    playlistId, 
+    playlistItemIds 
+  }: RemoveUnavailableVideosParams): Promise<RemoveUnavailableVideosResult> {
+    try {
+      this.initialize();
+      
+      if (!playlistItemIds || playlistItemIds.length === 0) {
+        return {
+          playlistId,
+          totalAttempted: 0,
+          removedCount: 0,
+          failedCount: 0,
+          results: []
+        };
+      }
+      
+      const results: RemovalResult[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+      
+      // Remove each playlist item
+      for (const itemId of playlistItemIds) {
+        try {
+          await this.youtube.playlistItems.delete({
+            id: itemId
+          });
+          results.push({
+            itemId,
+            status: 'removed',
+            success: true
+          });
+          successCount++;
+        } catch (error) {
+          results.push({
+            itemId,
+            status: 'failed',
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          failureCount++;
+        }
+      }
+      
+      return {
+        playlistId,
+        totalAttempted: playlistItemIds.length,
+        removedCount: successCount,
+        failedCount: failureCount,
+        results
+      };
+    } catch (error) {
+      throw new Error(`Failed to remove unavailable videos: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
   /**
    * Merge multiple playlists into a target playlist

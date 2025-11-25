@@ -99,6 +99,77 @@ export interface PlaylistItemsParams {
 }
 
 /**
+ * Find unavailable videos parameters
+ */
+export interface FindUnavailableVideosParams {
+  playlistId: string;
+  maxResults?: number;
+}
+
+/**
+ * Remove unavailable videos parameters
+ */
+export interface RemoveUnavailableVideosParams {
+  playlistId: string;
+  playlistItemIds: string[];
+}
+
+/**
+ * Unavailable video item information
+ */
+export interface UnavailableVideoItem {
+  id: string;
+  title: string;
+  videoId: string;
+  privacyStatus: string;
+  position: number;
+}
+
+/**
+ * Find unavailable videos result
+ */
+export interface FindUnavailableVideosResult {
+  playlistId: string;
+  totalItems: number;
+  unavailableCount: number;
+  unavailableItems: UnavailableVideoItem[];
+}
+
+/**
+ * Removal result for a single playlist item
+ */
+export interface RemovalResult {
+  itemId: string;
+  status: 'removed' | 'failed';
+  error?: string;
+}
+
+/**
+ * Remove unavailable videos result
+ */
+export interface RemoveUnavailableVideosResult {
+  playlistId: string;
+  totalAttempted: number;
+  removedCount: number;
+  failedCount: number;
+  results: RemovalResult[];
+}
+
+/**
+ * YouTube playlist item from API response (minimal subset)
+ */
+export interface YouTubePlaylistItem {
+  id?: string;
+  snippet?: {
+    title?: string;
+    position?: number;
+    resourceId?: {
+      videoId?: string;
+    };
+  };
+  status?: {
+    privacyStatus?: string;
+  };
  * Merge playlists parameters
  */
 export interface MergePlaylistsParams {
