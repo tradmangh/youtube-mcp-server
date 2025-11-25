@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { PlaylistParams, PlaylistItemsParams, PlaylistItemsSinceParams, SearchParams, PlaylistItem } from '../types.js';
+import { PlaylistItem, PlaylistParams, PlaylistItemsParams,  PlaylistItemsSinceParams, SearchParams, MergePlaylistsParams, MergePlaylistsReport, SourcePlaylistReport, MergeItem, MergeError } from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -103,6 +103,146 @@ export class PlaylistService {
   }
 
   /**
+   * Merge multiple playlists into a target playlist
+   * Returns a detailed report of the merge operation
+   */
+  async mergePlaylists({
+    sourcePlaylists,
+    targetPlaylist,
+    dedupe = false
+  }: MergePlaylistsParams): Promise<MergePlaylistsReport> {
+    try {
+      this.initialize();
+
+      // Validate inputs
+      if (!sourcePlaylists || sourcePlaylists.length === 0) {
+        throw new Error('At least one source playlist is required');
+      }
+      if (!targetPlaylist) {
+        throw new Error('Target playlist is required');
+      }
+
+      const report: MergePlaylistsReport = {
+        sourcePlaylists: [],
+        targetPlaylist: targetPlaylist,
+        totalItemsProcessed: 0,
+        uniqueItems: 0,
+        duplicatesRemoved: 0,
+        errors: [],
+        itemsToMerge: [],
+        summary: ''
+      };
+
+      // Fetch all items from source playlists
+      const allItems: MergeItem[] = [];
+      const videoIdSet = new Set<string>();
+
+      for (const playlistId of sourcePlaylists) {
+        try {
+          // Fetch all items from this playlist (may need pagination for large playlists)
+          const items = await this.getAllPlaylistItems(playlistId);
+          
+          const sourceReport: SourcePlaylistReport = {
+            playlistId: playlistId,
+            itemCount: items.length,
+            itemsAdded: 0,
+            duplicatesSkipped: 0
+          };
+
+          for (const item of items) {
+            const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+            
+            if (!videoId) {
+              const error: MergeError = {
+                playlistId: playlistId,
+                error: 'Missing videoId for item',
+                itemId: item.id
+              };
+              report.errors.push(error);
+              continue;
+            }
+
+            report.totalItemsProcessed++;
+
+            if (dedupe && videoIdSet.has(videoId)) {
+              sourceReport.duplicatesSkipped++;
+              report.duplicatesRemoved++;
+            } else {
+              const mergeItem: MergeItem = {
+                videoId: videoId,
+                title: item.snippet?.title,
+                sourcePlaylistId: playlistId,
+                position: item.snippet?.position
+              };
+              allItems.push(mergeItem);
+              videoIdSet.add(videoId);
+              sourceReport.itemsAdded++;
+            }
+          }
+
+          report.sourcePlaylists.push(sourceReport);
+        } catch (error) {
+          const mergeError: MergeError = {
+            playlistId: playlistId,
+            error: error instanceof Error ? error.message : String(error)
+          };
+          report.errors.push(mergeError);
+        }
+      }
+
+      report.uniqueItems = allItems.length;
+
+      // Get target playlist info
+      try {
+        const targetInfo = await this.getPlaylist({ playlistId: targetPlaylist });
+        report.targetPlaylistInfo = {
+          title: targetInfo?.snippet?.title,
+          description: targetInfo?.snippet?.description,
+          itemCount: targetInfo?.contentDetails?.itemCount
+        };
+      } catch (error) {
+        const mergeError: MergeError = {
+          playlistId: targetPlaylist,
+          error: `Failed to fetch target playlist: ${error instanceof Error ? error.message : String(error)}`
+        };
+        report.errors.push(mergeError);
+      }
+
+      // Return the merge report with items that would be added
+      report.itemsToMerge = allItems;
+      report.summary = `Processed ${report.totalItemsProcessed} items from ${sourcePlaylists.length} source playlist(s). ` +
+                       `${report.uniqueItems} unique items ready to merge into target playlist.` +
+                       (dedupe ? ` ${report.duplicatesRemoved} duplicates removed.` : '');
+
+      return report;
+    } catch (error) {
+      throw new Error(`Failed to merge playlists: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Helper method to fetch all items from a playlist (handles pagination)
+   */
+  private async getAllPlaylistItems(playlistId: string): Promise<any[]> {
+    const allItems: any[] = [];
+    let pageToken: string | undefined = undefined;
+
+    do {
+      const response = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails'],
+        playlistId,
+        maxResults: 50,
+        pageToken
+      });
+
+      if (response.data.items) {
+        allItems.push(...response.data.items);
+      }
+
+      pageToken = response.data.nextPageToken;
+    } while (pageToken);
+
+    return allItems;
    * Get playlist items added after a specific timestamp
    */
   async getPlaylistItemsSince({ 

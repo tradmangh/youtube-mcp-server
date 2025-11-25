@@ -29,6 +29,7 @@ A Model Context Protocol (MCP) server implementation for YouTube, enabling AI la
 * Get playlist details
 * Search within playlists
 * Get playlist video transcripts
+* Merge multiple playlists with deduplication support
 
 ## Installation
 
@@ -207,6 +208,23 @@ const playlistItems = await youtube.playlists.getPlaylistItems({
 const playlist = await youtube.playlists.getPlaylist({
   playlistId: "playlist-id"
 });
+
+// Merge multiple playlists
+const mergeReport = await youtube.playlists.mergePlaylists({
+  sourcePlaylists: ["playlist-id-1", "playlist-id-2", "playlist-id-3"],
+  targetPlaylist: "target-playlist-id",
+  dedupe: true  // Remove duplicate videos by videoId
+});
+
+// The merge report includes:
+// - sourcePlaylists: Array of source playlist stats (itemCount, itemsAdded, duplicatesSkipped)
+// - totalItemsProcessed: Total number of items from all source playlists
+// - uniqueItems: Number of unique items after deduplication
+// - duplicatesRemoved: Number of duplicates removed (if dedupe=true)
+// - itemsToMerge: Array of items with videoId, title, sourcePlaylistId, and position
+// - targetPlaylistInfo: Target playlist metadata (title, description, itemCount)
+// - errors: Array of any errors encountered during processing
+// - summary: Human-readable summary of the merge operation
 ```
 
 ## Development

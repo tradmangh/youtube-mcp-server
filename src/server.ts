@@ -16,6 +16,7 @@ import {
     ChannelVideosParams,
     PlaylistParams,
     PlaylistItemsParams,
+    MergePlaylistsParams,
     PlaylistItemsSinceParams,
 } from './types.js';
 
@@ -184,6 +185,31 @@ export async function startMcpServer() {
                     },
                 },
                 {
+                    name: 'playlists_mergePlaylists',
+                    description: 'Merge multiple playlists by consolidating their items. Returns a detailed report showing items from all source playlists, with optional deduplication by videoId.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            sourcePlaylists: {
+                                type: 'array',
+                                description: 'Array of source playlist IDs to merge from',
+                                items: {
+                                    type: 'string',
+                                },
+                            },
+                            targetPlaylist: {
+                                type: 'string',
+                                description: 'Target playlist ID to merge into',
+                            },
+                            dedupe: {
+                                type: 'boolean',
+                                description: 'Whether to deduplicate items by videoId (default: false)',
+                            },
+                        },
+                        required: ['sourcePlaylists', 'targetPlaylist'],
+                    },
+                  },
+                {
                     name: 'playlists_getPlaylistItemsSince',
                     description: 'Get playlist items added after a specific timestamp',
                     inputSchema: {
@@ -279,7 +305,11 @@ export async function startMcpServer() {
                         }]
                     };
                 }
-                
+
+                case 'playlists_mergePlaylists': {
+                    const result = await playlistService.mergePlaylists(args as unknown as MergePlaylistsParams);
+                }
+
                 case 'playlists_getPlaylistItems': {
                     const result = await playlistService.getPlaylistItems(args as unknown as PlaylistItemsParams);
                     return {
@@ -289,7 +319,6 @@ export async function startMcpServer() {
                         }]
                     };
                 }
-                
                 case 'playlists_getPlaylistItemsSince': {
                     const result = await playlistService.getPlaylistItemsSince(args as unknown as PlaylistItemsSinceParams);
                     return {
