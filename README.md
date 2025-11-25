@@ -13,6 +13,7 @@ A Model Context Protocol (MCP) server implementation for YouTube, enabling AI la
 
 ### Transcript Management
 * Retrieve video transcripts
+* **NEW: `get_transcript` - Enhanced transcript access with text normalization for LLM processing**
 * Support for multiple languages
 * Get timestamped captions
 * Search within transcripts
@@ -164,6 +165,12 @@ const transcript = await youtube.transcripts.getTranscript({
   videoId: "video-id",
   language: "en"
 });
+
+// Get improved, normalized transcript for LLM processing
+const cleanTranscript = await youtube.get_transcript({
+  videoId: "video-id"
+});
+// Returns: { plainText, timestampedSegments, language, segmentCount }
 
 // Search videos
 const searchResults = await youtube.videos.searchVideos({
