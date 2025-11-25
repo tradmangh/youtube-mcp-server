@@ -335,6 +335,13 @@ export async function startMcpServer() {
                 
                 case 'playlists_removeUnavailableVideos': {
                     const result = await playlistService.removeUnavailableVideos(args as unknown as RemoveUnavailableVideosParams);
+                    return {
+                        content: [{
+                            type: 'text',
+                                text: JSON.stringify(result, null, 2)
+                            }]
+                        };
+                    }
                 case 'playlists_getPlaylistItemsSince': {
                     const result = await playlistService.getPlaylistItemsSince(args as unknown as PlaylistItemsSinceParams);
                     return {
