@@ -13,6 +13,7 @@ A Model Context Protocol (MCP) server implementation for YouTube, enabling AI la
 
 ### Transcript Management
 * Retrieve video transcripts
+* **NEW: `get_transcript` - Enhanced transcript access with text normalization for LLM processing**
 * Support for multiple languages
 * Get timestamped captions
 * Search within transcripts
@@ -28,6 +29,7 @@ A Model Context Protocol (MCP) server implementation for YouTube, enabling AI la
 * Get playlist details
 * Search within playlists
 * Get playlist video transcripts
+* Merge multiple playlists with deduplication support
 
 ## Installation
 
@@ -292,6 +294,12 @@ const transcript = await youtube.transcripts.getTranscript({
   language: "en"
 });
 
+// Get improved, normalized transcript for LLM processing
+const cleanTranscript = await youtube.get_transcript({
+  videoId: "video-id"
+});
+// Returns: { plainText, timestampedSegments, language, segmentCount }
+
 // Search videos
 const searchResults = await youtube.videos.searchVideos({
   query: "search term",
@@ -354,6 +362,22 @@ const privatePlaylistItems = await youtube.playlists.getPlaylistItems({
 const unlistedVideo = await youtube.videos.getVideo({
   videoId: "unlisted-video-id"
 });
+// Merge multiple playlists
+const mergeReport = await youtube.playlists.mergePlaylists({
+  sourcePlaylists: ["playlist-id-1", "playlist-id-2", "playlist-id-3"],
+  targetPlaylist: "target-playlist-id",
+  dedupe: true  // Remove duplicate videos by videoId
+});
+
+// The merge report includes:
+// - sourcePlaylists: Array of source playlist stats (itemCount, itemsAdded, duplicatesSkipped)
+// - totalItemsProcessed: Total number of items from all source playlists
+// - uniqueItems: Number of unique items after deduplication
+// - duplicatesRemoved: Number of duplicates removed (if dedupe=true)
+// - itemsToMerge: Array of items with videoId, title, sourcePlaylistId, and position
+// - targetPlaylistInfo: Target playlist metadata (title, description, itemCount)
+// - errors: Array of any errors encountered during processing
+// - summary: Human-readable summary of the merge operation
 ```
 
 ## Development

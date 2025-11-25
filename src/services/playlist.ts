@@ -1,6 +1,24 @@
 import { google } from 'googleapis';
-import { PlaylistParams, PlaylistItemsParams, SearchParams } from '../types.js';
 import { AuthManager } from '../auth.js';
+import { 
+  PlaylistItem,
+  PlaylistParams, 
+  PlaylistItemsParams, 
+  PlaylistItemsSinceParams,
+  SearchParams, 
+  FindUnavailableVideosParams, 
+  RemoveUnavailableVideosParams,
+  FindUnavailableVideosResult,
+  RemoveUnavailableVideosResult,
+  UnavailableVideoItem,
+  RemovalResult,
+  YouTubePlaylistItem,
+  MergePlaylistsParams, 
+  MergePlaylistsReport, 
+  SourcePlaylistReport, 
+  MergeItem, 
+  MergeError 
+} from '../types.js';
 
 /**
  * Service for interacting with YouTube playlists
@@ -57,7 +75,7 @@ export class PlaylistService {
   async getPlaylistItems({ 
     playlistId, 
     maxResults = 50 
-  }: PlaylistItemsParams): Promise<any[]> {
+  }: PlaylistItemsParams): Promise<PlaylistItem[]> {
     try {
       await this.initialize();
       
@@ -67,7 +85,13 @@ export class PlaylistService {
         maxResults
       });
       
-      return response.data.items || [];
+      const items = response.data.items || [];
+      
+      // Map the snippet.publishedAt field to addedAt for each item
+      return items.map((item: any) => ({
+        ...item,
+        addedAt: item.snippet?.publishedAt
+      }));
     } catch (error) {
       throw new Error(`Failed to get playlist items: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -118,6 +142,302 @@ export class PlaylistService {
       return response.data.items || [];
     } catch (error) {
       throw new Error(`Failed to get user playlists: ${error instanceof Error ? error.message : String(error)}`);
+   * Find unavailable videos in a playlist
+   * Returns playlist items that are deleted, private, or otherwise unavailable
+   */
+  async findUnavailableVideos({ 
+    playlistId, 
+    maxResults = 50 
+  }: FindUnavailableVideosParams): Promise<FindUnavailableVideosResult> {
+    try {
+      this.initialize();
+      
+      const response = await this.youtube.playlistItems.list({
+        part: ['snippet', 'status'],
+        playlistId,
+        maxResults
+      });
+      
+      const items = response.data.items || [];
+      const unavailableItems = items.filter((item: YouTubePlaylistItem) => {
+        // Check if video is private or deleted
+        const privacyStatus = item.status?.privacyStatus;
+        const title = item.snippet?.title;
+        
+        // Videos that are deleted or private show specific patterns:
+        // 1. Title is "Deleted video" or "Private video"
+        // 2. Privacy status is 'private' or 'privacyStatusUnspecified'
+        const isDeletedOrPrivate = 
+          title === 'Deleted video' || 
+          title === 'Private video' ||
+          privacyStatus === 'privacyStatusUnspecified';
+        
+        return isDeletedOrPrivate;
+      });
+      
+      return {
+        playlistId,
+        totalItems: items.length,
+        unavailableCount: unavailableItems.length,
+        unavailableItems: unavailableItems.map((item: YouTubePlaylistItem): UnavailableVideoItem => ({
+          id: item.id || '',
+          title: item.snippet?.title || '',
+          videoId: item.snippet?.resourceId?.videoId || '',
+          privacyStatus: item.status?.privacyStatus || '',
+          position: item.snippet?.position || 0
+        }))
+      };
+    } catch (error) {
+      throw new Error(`Failed to find unavailable videos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Remove unavailable videos from a playlist
+   * Deletes the specified playlist items
+   */
+  async removeUnavailableVideos({ 
+    playlistId, 
+    playlistItemIds 
+  }: RemoveUnavailableVideosParams): Promise<RemoveUnavailableVideosResult> {
+    try {
+      this.initialize();
+      
+      if (!playlistItemIds || playlistItemIds.length === 0) {
+        return {
+          playlistId,
+          totalAttempted: 0,
+          removedCount: 0,
+          failedCount: 0,
+          results: []
+        };
+      }
+      
+      const results: RemovalResult[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+      
+      // Remove each playlist item
+      for (const itemId of playlistItemIds) {
+        try {
+          await this.youtube.playlistItems.delete({
+            id: itemId
+          });
+          results.push({
+            itemId,
+            status: 'removed',
+            success: true
+          });
+          successCount++;
+        } catch (error) {
+          results.push({
+            itemId,
+            status: 'failed',
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          failureCount++;
+        }
+      }
+      
+      return {
+        playlistId,
+        totalAttempted: playlistItemIds.length,
+        removedCount: successCount,
+        failedCount: failureCount,
+        results
+      };
+    } catch (error) {
+      throw new Error(`Failed to remove unavailable videos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+  /**
+   * Merge multiple playlists into a target playlist
+   * Returns a detailed report of the merge operation
+   */
+  async mergePlaylists({
+    sourcePlaylists,
+    targetPlaylist,
+    dedupe = false
+  }: MergePlaylistsParams): Promise<MergePlaylistsReport> {
+    try {
+      this.initialize();
+
+      // Validate inputs
+      if (!sourcePlaylists || sourcePlaylists.length === 0) {
+        throw new Error('At least one source playlist is required');
+      }
+      if (!targetPlaylist) {
+        throw new Error('Target playlist is required');
+      }
+
+      const report: MergePlaylistsReport = {
+        sourcePlaylists: [],
+        targetPlaylist: targetPlaylist,
+        totalItemsProcessed: 0,
+        uniqueItems: 0,
+        duplicatesRemoved: 0,
+        errors: [],
+        itemsToMerge: [],
+        summary: ''
+      };
+
+      // Fetch all items from source playlists
+      const allItems: MergeItem[] = [];
+      const videoIdSet = new Set<string>();
+
+      for (const playlistId of sourcePlaylists) {
+        try {
+          // Fetch all items from this playlist (may need pagination for large playlists)
+          const items = await this.getAllPlaylistItems(playlistId);
+          
+          const sourceReport: SourcePlaylistReport = {
+            playlistId: playlistId,
+            itemCount: items.length,
+            itemsAdded: 0,
+            duplicatesSkipped: 0
+          };
+
+          for (const item of items) {
+            const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+            
+            if (!videoId) {
+              const error: MergeError = {
+                playlistId: playlistId,
+                error: 'Missing videoId for item',
+                itemId: item.id
+              };
+              report.errors.push(error);
+              continue;
+            }
+
+            report.totalItemsProcessed++;
+
+            if (dedupe && videoIdSet.has(videoId)) {
+              sourceReport.duplicatesSkipped++;
+              report.duplicatesRemoved++;
+            } else {
+              const mergeItem: MergeItem = {
+                videoId: videoId,
+                title: item.snippet?.title,
+                sourcePlaylistId: playlistId,
+                position: item.snippet?.position
+              };
+              allItems.push(mergeItem);
+              videoIdSet.add(videoId);
+              sourceReport.itemsAdded++;
+            }
+          }
+
+          report.sourcePlaylists.push(sourceReport);
+        } catch (error) {
+          const mergeError: MergeError = {
+            playlistId: playlistId,
+            error: error instanceof Error ? error.message : String(error)
+          };
+          report.errors.push(mergeError);
+        }
+      }
+
+      report.uniqueItems = allItems.length;
+
+      // Get target playlist info
+      try {
+        const targetInfo = await this.getPlaylist({ playlistId: targetPlaylist });
+        report.targetPlaylistInfo = {
+          title: targetInfo?.snippet?.title,
+          description: targetInfo?.snippet?.description,
+          itemCount: targetInfo?.contentDetails?.itemCount
+        };
+      } catch (error) {
+        const mergeError: MergeError = {
+          playlistId: targetPlaylist,
+          error: `Failed to fetch target playlist: ${error instanceof Error ? error.message : String(error)}`
+        };
+        report.errors.push(mergeError);
+      }
+
+      // Return the merge report with items that would be added
+      report.itemsToMerge = allItems;
+      report.summary = `Processed ${report.totalItemsProcessed} items from ${sourcePlaylists.length} source playlist(s). ` +
+                       `${report.uniqueItems} unique items ready to merge into target playlist.` +
+                       (dedupe ? ` ${report.duplicatesRemoved} duplicates removed.` : '');
+
+      return report;
+    } catch (error) {
+      throw new Error(`Failed to merge playlists: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Helper method to fetch all items from a playlist (handles pagination)
+   */
+  private async getAllPlaylistItems(playlistId: string): Promise<any[]> {
+    const allItems: any[] = [];
+    let pageToken: string | undefined = undefined;
+
+    do {
+      const response = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails'],
+        playlistId,
+        maxResults: 50,
+        pageToken
+      });
+
+      if (response.data.items) {
+        allItems.push(...response.data.items);
+      }
+
+      pageToken = response.data.nextPageToken;
+    } while (pageToken);
+
+    return allItems;
+   * Get playlist items added after a specific timestamp
+   */
+  async getPlaylistItemsSince({ 
+    playlistId, 
+    since 
+  }: PlaylistItemsSinceParams): Promise<any[]> {
+    try {
+      this.initialize();
+      
+      // Validate the ISO-8601 timestamp
+      const sinceDate = new Date(since);
+      if (isNaN(sinceDate.getTime())) {
+        throw new Error(`Invalid timestamp format: '${since}'. Expected ISO-8601 format (e.g., '2024-01-01T00:00:00Z')`);
+      }
+      
+      // Fetch all playlist items (we'll filter them)
+      // Note: YouTube API doesn't support filtering by date directly, so we need to fetch and filter
+      const response = await this.youtube.playlistItems.list({
+        part: ['snippet', 'contentDetails', 'status'],
+        playlistId,
+        maxResults: 50 // Fetch more items to increase chances of finding recent ones
+      });
+      
+      const items = response.data.items || [];
+      
+      // Filter items where publishedAt (addedAt) is strictly greater than since
+      const filteredItems = items.filter((item: any) => {
+        const publishedAt = item.snippet?.publishedAt;
+        if (!publishedAt) return false;
+        
+        const itemDate = new Date(publishedAt);
+        return itemDate.getTime() > sinceDate.getTime();
+      });
+      
+      // Return compact item shape
+      return filteredItems.map((item: any) => ({
+        id: item.id,
+        playlistId: item.snippet?.playlistId,
+        videoId: item.snippet?.resourceId?.videoId,
+        title: item.snippet?.title,
+        description: item.snippet?.description,
+        position: item.snippet?.position,
+        addedAt: item.snippet?.publishedAt
+      }));
+    } catch (error) {
+      throw new Error(`Failed to get playlist items since: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
